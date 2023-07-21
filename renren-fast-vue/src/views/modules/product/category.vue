@@ -11,18 +11,27 @@
                     <el-button v-if="node.childNodes.length == 0" type="text" size="mini" @click="() => remove(node, data)">
                         Delete
                     </el-button>
+                    <el-button type="text" size="mini" @click="() => edit(data)">
+                        Edit
+                    </el-button>
                 </span>
             </span></el-tree>
 
-        <el-dialog title="提示" :visible.sync="dialogVisible" width="30%">
+        <el-dialog :title="title" :visible.sync="dialogVisible" width="30%" :close-on-click-modal=false>
             <el-form :model="category">
-                <el-form-item label="分类名">
+                <el-form-item label="分类名称">
                     <el-input v-model="category.name" autocomplete="off"></el-input>
+                </el-form-item>
+                <el-form-item label="图标">
+                    <el-input v-model="category.icon" autocomplete="off"></el-input>
+                </el-form-item>
+                <el-form-item label="计量单位">
+                    <el-input v-model="category.productUnit" autocomplete="off"></el-input>
                 </el-form-item>
             </el-form>
             <span slot="footer" class="dialog-footer">
                 <el-button @click="dialogVisible = false">取 消</el-button>
-                <el-button type="primary" @click="addCategory">确 定</el-button>
+                <el-button type="primary" @click="submitData">确 定</el-button>
             </span>
         </el-dialog>
     </div>
@@ -37,7 +46,13 @@ export default {
     props: {},
     data() {
         return {
-            category: { name: "", parentCid: 0, catLevel: 0, showStatus: 1, sort: 0 },
+            //判断是在添加时弹出的对话框还是在修改时弹出的对话框，从而显示对应的对话框
+            title: "",
+            dialogType: "",//edit,add
+            category: {
+                name: "", parentCid: 0, catLevel: 0, showStatus: 1, sort: 0, catId: null
+                , icon: "", productUnit: ""
+            },
             dialogVisible: false,
             menus: [],
             expandedkey: [],
@@ -48,6 +63,34 @@ export default {
         };
     },
     methods: {
+        submitData() {
+            if (this.dialogType == "add") {
+                this.addCategory();
+            }
+            if (this.dialogType == "edit") {
+                this.editcategory();
+            }
+        },
+        //修改三级分类数据
+        editcategory() {
+            var { catId, name, icon, productUnit } = this.category;
+            this.$http({
+                url: this.$http.adornUrl('/product/category/update'),
+                method: 'post',
+                data: this.$http.adornData({ catId, name, icon, productUnit }, false)
+            }).then(({ data }) => {
+                this.$message({
+                    message: '菜单修改成功！',
+                    type: 'success'
+                });
+                //关闭对话框
+                this.dialogVisible = false;
+                //刷新出新的菜单
+                this.getMenus();
+                //设置需要默认展开的菜单
+                this.expandedkey = [this.category.parentCid];
+            });
+        },
         //添加三级分类
         addCategory() {
             console.log("提交的三级分类数据", this.category);
@@ -60,12 +103,36 @@ export default {
                     message: '菜单保存成功！',
                     type: 'success'
                 });
+                //关闭对话框
                 this.dialogVisible = false;
                 //刷新出新的菜单
                 this.getMenus();
                 //设置需要默认展开的菜单
                 this.expandedkey = [this.category.parentCid];
             });
+        },
+        edit(data) {
+            this.dialogType = "edit";
+            this.title = "修改分类";
+            console.log("要修改的数据", data);
+            this.dialogVisible = true;
+            //向后端发送请求重新获取当前节点最新的内容
+            this.$http({
+                url: this.$http.adornUrl(`/product/category/info/${data.catId}`),
+                method: 'get'
+            }).then(({ data }) => {
+                //请求成功
+                console.log("要回显的数据", data);
+                this.category.name = data.data.name;
+                this.category.catId = data.data.catId;
+                this.category.icon = data.data.icon;
+                this.category.productUnit = data.data.productUnit;
+                this.category.parentCid = data.data.parentCid;
+                this.category.catLevel = data.data.catLevel;
+                this.category.showStatus = data.data.showStatus;
+                this.category.sort = data.data.sort;
+            })
+
         },
         getMenus() {
             this.$http({
@@ -77,11 +144,20 @@ export default {
             })
         },
         append(data) {
+            console.log("append", data);
+            this.dialogType = "add"
             this.dialogVisible = true;
             this.category.parentCid = data.catId;
             this.category.catLevel = data.catLevel * 1 + 1;
+            this.title = "添加分类";
+            this.category.name = null;
+            this.category.catId = null;
+            this.category.icon = "";
+            this.category.productUnit = "";
+            this.category.parentCid = data.data.parentCid;
+            this.category.showStatus = 1;
+            this.category.sort = 0;
 
-            console.log("append", data);
         },
 
         remove(node, data) {
