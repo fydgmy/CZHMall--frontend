@@ -1,7 +1,8 @@
 <template>
     <div>
         <el-tree :data="menus" :props="defaultProps" :expand-on-click-node="false" show-checkbox node-key="catId"
-            :default-expanded-keys="expandedkey" :draggable="true" :allow-drop="allowDrop" :allow-drag="allowDrag">
+            :default-expanded-keys="expandedkey" :draggable="true" :allow-drop="allowDrop" :allow-drag="allowDrag"
+            @node-drop="handleDrop">
             <span class="custom-tree-node" slot-scope="{ node, data }">
                 <span>{{ node.label }}</span>
                 <span>
@@ -46,8 +47,9 @@ export default {
     props: {},
     data() {
         return {
+            updateNodes: [],
             //判断是在添加时弹出的对话框还是在修改时弹出的对话框，从而显示对应的对话框
-            maxLevel:0,
+            maxLevel: 0,
             title: "",
             dialogType: "",//edit,add
             category: {
@@ -64,12 +66,58 @@ export default {
         };
     },
     methods: {
-        countNodeLevel(node){
+        handleDrop(draggingNode, dropNode, dropType, ev) {
+            console.log('tree drop: ', draggingNode, dropNode, dropType);
+            //1.当前节点最新的父节点id
+            let pCid = 0;
+            let siblings = null;
+            if (dropType == "before" || dropType == "after") {
+                pCid = dropNode.parent.data.catId == undefined ? 0 : dropNode.parent.data.catId;
+                siblings = dropNode.parent.childNodes
+            } else {
+                pCid = dropNode.data.catId;
+                siblings = dropNode.childNodes;
+            }
+            //2.当前拖拽节点的最新顺序
+            for (let i = 0; i < siblings.length; i++) {
+                if (siblings[i].data.catId == draggingNode.data.catId) {
+                    //如果遍历的时正在拖拽的节点
+                    //如果当前节点的层级发生了变化
+                    let catLevel = draggingNode.level;
+                    if (siblings[i].level != draggingNode.level) {
+                        //当前节点的层级发生了变化 
+                        catLevel = siblings[i].level;
+                        //修改子节点的层级
+                        this.updateChildNodeLevel(siblings[i]);
+                    }
+                    this.updateNodes.push({ catId: siblings[i].data.catId, sort: i, parentCid: pCid, catLevel: catLevel });
+                } else {
+                    this.updateNodes.push({ catId: siblings[i].data.catId, sort: i });
+                }
+
+            }
+            //3.当前拖拽节点的最新层级
+
+            console.log("updateNodes", this.updateNodes);
+
+        },
+        updateChildNodeLevel(node) {
+            if (node.childNodes.length > 0) {
+                for (let i = 0; i < node.childNodes.length; i++) {
+                   var cNode=node.childNodes[i].data;
+                  this.updateNodes.push({catId:cNode.catId,catLevel:node.childNodes[i].level}) 
+                   cNode.catLevel=node.childNodes[i].level;
+                   this.updateChildNodeLevel(node.childNodes[i]);
+                }
+            }
+
+        },
+        countNodeLevel(node) {
             //找到所有子节点，求出最大深度
-            if(node.children!=null&&node.children.length>0){
-                for(let i=0;i<node.children.length;i++){
-                    if(node.children[i].catLevel>this.maxLevel){
-                        this.maxLevel=node.children[i].catLevel;
+            if (node.children != null && node.children.length > 0) {
+                for (let i = 0; i < node.children.length; i++) {
+                    if (node.children[i].catLevel > this.maxLevel) {
+                        this.maxLevel = node.children[i].catLevel;
                     }
                     this.countNodeLevel(node.children[i]);
                 }
@@ -80,18 +128,18 @@ export default {
             判断：
             1.被拖动的当前节点以及所在的父节点总层数不能大于3
             1>被拖动的当前节点的总层数 
-            */ 
+            */
             this.countNodeLevel(draggingNode.data);
             console.log("allowDrop:", draggingNode, dropNode, type);
             //当前正在拖动的节点+父节点所在的深度不大于3即可
-            let deep=this.maxLevel-draggingNode.data.catLevel+1;
-            console.log("深度",this.maxLevel);
-            if(type =="inner"){
-                return (deep+dropNode.level)<=3
-            }else{
-                return (deep+dropNode.parent.level)<=3;
+            let deep = this.maxLevel - draggingNode.data.catLevel + 1;
+            console.log("深度", this.maxLevel);
+            if (type == "inner") {
+                return (deep + dropNode.level) <= 3
+            } else {
+                return (deep + dropNode.parent.level) <= 3;
             }
-        },  
+        },
         allowDrag(draggingNode) {
             return true;
         },
