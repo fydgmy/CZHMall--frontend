@@ -1,8 +1,11 @@
 <template>
     <div>
+        <el-switch v-model="draggable" active-text="开启拖拽" inactive-text="关闭拖拽">
+        </el-switch>
+        <el-button v-if="draggable" @click="batchSave">批量保存</el-button>
         <el-tree :data="menus" :props="defaultProps" :expand-on-click-node="false" show-checkbox node-key="catId"
-            :default-expanded-keys="expandedkey" :draggable="true" :allow-drop="allowDrop" :allow-drag="allowDrag"
-            @node-drop="handleDrop">
+            :default-expanded-keys="expandedkey"  :draggable="draggable" :allow-drop="allowDrop" :allow-drag="allowDrag"
+            @node-drop="handleDrop"  >
             <span class="custom-tree-node" slot-scope="{ node, data }">
                 <span>{{ node.label }}</span>
                 <span>
@@ -47,6 +50,8 @@ export default {
     props: {},
     data() {
         return {
+            pCid: [],
+            draggable: false,
             updateNodes: [],
             //判断是在添加时弹出的对话框还是在修改时弹出的对话框，从而显示对应的对话框
             maxLevel: 0,
@@ -66,6 +71,27 @@ export default {
         };
     },
     methods: {
+        batchSave(){
+            this.$http({
+                url: this.$http.adornUrl('/product/category/update/sort'),
+                method: 'post',
+                data: this.$http.adornData(this.updateNodes, false)
+            }).then(({ data }) => {
+                this.$message({
+                    message: '菜单顺序等修改成功！',
+                    type: 'success'
+                });
+                //关闭对话框
+                this.dialogVisible = false;
+                //刷新菜单
+                this.getMenus();
+                //设置需要默认展开的菜单
+                this.expandedkey = this.pCid;
+                this.updateNodes = [];
+                this.maxLevel = 0;
+               // this.pCid=0;
+            });
+        },
         handleDrop(draggingNode, dropNode, dropType, ev) {
             console.log('tree drop: ', draggingNode, dropNode, dropType);
             //1.当前节点最新的父节点id
@@ -78,6 +104,7 @@ export default {
                 pCid = dropNode.data.catId;
                 siblings = dropNode.childNodes;
             }
+            this.pCid.push(pCid);
             //2.当前拖拽节点的最新顺序
             for (let i = 0; i < siblings.length; i++) {
                 if (siblings[i].data.catId == draggingNode.data.catId) {
@@ -97,26 +124,8 @@ export default {
 
             }
             //3.当前拖拽节点的最新层级
-
             console.log("updateNodes", this.updateNodes);
-            this.$http({
-                url: this.$http.adornUrl('/product/category/update/sort'),
-                method: 'post',
-                data: this.$http.adornData(this.updateNodes, false)
-            }).then(({ data }) => {
-                this.$message({
-                    message: '菜单顺序等修改成功！',
-                    type: 'success'
-                });
-                //关闭对话框
-                this.dialogVisible = false;
-                //刷新菜单
-                this.getMenus();
-                //设置需要默认展开的菜单
-                this.expandedkey = [pCid];
-                this.updateNodes = [];
-                this.maxLevel = 0;       
-            });
+            
         },
         updateChildNodeLevel(node) {
             if (node.childNodes.length > 0) {
@@ -131,12 +140,12 @@ export default {
         },
         countNodeLevel(node) {
             //找到所有子节点，求出最大深度
-            if (node.children != null && node.children.length > 0) {
-                for (let i = 0; i < node.children.length; i++) {
-                    if (node.children[i].catLevel > this.maxLevel) {
-                        this.maxLevel = node.children[i].catLevel;
+            if (node.childNodes != null && node.childNodes.length > 0) {
+                for (let i = 0; i < node.childNodes.length; i++) {
+                    if (node.childNodes[i].level > this.maxLevel) {
+                        this.maxLevel = node.childNodes[i].level;
                     }
-                    this.countNodeLevel(node.children[i]);
+                    this.countNodeLevel(node.childNodes[i]);
                 }
             }
         },
@@ -146,14 +155,14 @@ export default {
             1.被拖动的当前节点以及所在的父节点总层数不能大于3
             1>被拖动的当前节点的总层数 
             */
-            this.countNodeLevel(draggingNode.data);
+            this.countNodeLevel(draggingNode);
             console.log("allowDrop:", draggingNode, dropNode, type);
             //当前正在拖动的节点+父节点所在的深度不大于3即可
-            let deep = this.maxLevel - draggingNode.data.catLevel + 1;
+            let deep = Math.abs(this.maxLevel - draggingNode.level) + 1;
             console.log("深度", this.maxLevel);
             if (type == "inner") {
+               // console.log(`this.maxLevel:${this.maxLevel};draggingNode.data.catLevel:${draggingNode.data.catLevel};dropNode.level:${dropNode.level}`);
                 return (deep + dropNode.level) <= 3;
-                console.log(`this.maxLevel:${this.maxLevel};draggingNode.data.catLevel:${draggingNode.data.catLevel};dropNode.level:${dropNode.level}`);
             } else {
                 return (deep + dropNode.parent.level) <= 3;
             }
