@@ -99,15 +99,32 @@ export default {
             //3.当前拖拽节点的最新层级
 
             console.log("updateNodes", this.updateNodes);
-
+            this.$http({
+                url: this.$http.adornUrl('/product/category/update/sort'),
+                method: 'post',
+                data: this.$http.adornData(this.updateNodes, false)
+            }).then(({ data }) => {
+                this.$message({
+                    message: '菜单顺序等修改成功！',
+                    type: 'success'
+                });
+                //关闭对话框
+                this.dialogVisible = false;
+                //刷新菜单
+                this.getMenus();
+                //设置需要默认展开的菜单
+                this.expandedkey = [pCid];
+                this.updateNodes = [];
+                this.maxLevel = 0;       
+            });
         },
         updateChildNodeLevel(node) {
             if (node.childNodes.length > 0) {
                 for (let i = 0; i < node.childNodes.length; i++) {
-                   var cNode=node.childNodes[i].data;
-                  this.updateNodes.push({catId:cNode.catId,catLevel:node.childNodes[i].level}) 
-                   cNode.catLevel=node.childNodes[i].level;
-                   this.updateChildNodeLevel(node.childNodes[i]);
+                    var cNode = node.childNodes[i].data;
+                    this.updateNodes.push({ catId: cNode.catId, catLevel: node.childNodes[i].level })
+                    cNode.catLevel = node.childNodes[i].level;
+                    this.updateChildNodeLevel(node.childNodes[i]);
                 }
             }
 
@@ -135,7 +152,8 @@ export default {
             let deep = this.maxLevel - draggingNode.data.catLevel + 1;
             console.log("深度", this.maxLevel);
             if (type == "inner") {
-                return (deep + dropNode.level) <= 3
+                return (deep + dropNode.level) <= 3;
+                console.log(`this.maxLevel:${this.maxLevel};draggingNode.data.catLevel:${draggingNode.data.catLevel};dropNode.level:${dropNode.level}`);
             } else {
                 return (deep + dropNode.parent.level) <= 3;
             }
